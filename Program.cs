@@ -1,5 +1,4 @@
 using System;
-using System.Device.Gpio;
 using System.Diagnostics;
 using System.IO;
 using System.Threading;
@@ -8,16 +7,12 @@ namespace SimonGame
 {
     class Program
     {
-        private static GpioController s_GpioController;
-        private static GpioPin[] leds = new GpioPin[4];
-        private static GpioPin[] buttons = new GpioPin[4];
         private static Color[] sequence;
         private static int sequenceIndex = 0;
         private static Timer timer;
         private static bool acceptingInput = false;
         private static int round = 1;
         private static bool gameOver = false;
-        private static bool debounceActive = false;
         private static int buttonsPressed = 0;
         private static DateTime gameStartTime;
         private static StreamWriter logWriter;
@@ -25,34 +20,16 @@ namespace SimonGame
 
         static void Main()
         {
-            s_GpioController = new GpioController();
+            Console.WriteLine("Welcome to Simon Game!");
 
-            int[] ledPins = { 12, 4, 15, 26 };
-            int[] buttonPins = { 14, 16, 2, 25 };
-
-            for (int i = 0; i < 4; i++)
-            {
-                leds[i] = s_GpioController.OpenPin(ledPins[i], PinMode.Output);
-                buttons[i] = s_GpioController.OpenPin(buttonPins[i], PinMode.InputPullUp);
-
-                leds[i].Write(PinValue.Low);
-            }
-
-            // Initialize log file
-            logWriter = new StreamWriter(LogFilePath, true); // Append mode
+            logWriter = new StreamWriter(LogFilePath, true);
 
             Log("Game Started");
             gameStartTime = DateTime.UtcNow;
 
-            for (int i = 0; i < 4; i++)
-            {
-                int buttonIndex = i;
-                buttons[i].ValueChanged += (sender, args) => Button_ValueChanged(leds[buttonIndex], args, (Color)buttonIndex);
-            }
-
             StartGame();
 
-            Thread.Sleep(Timeout.Infinite);
+            Console.ReadLine();
         }
 
         private static void StartGame()
@@ -62,7 +39,7 @@ namespace SimonGame
 
             if (round == 1)
             {
-                sequence = GenerateRandomSequence(50);
+                sequence = GenerateRandomSequence(5);
             }
 
             Log($"Round {round} Started");
@@ -75,65 +52,65 @@ namespace SimonGame
             sequenceIndex = 0;
             acceptingInput = false;
 
-            timer = new Timer(TurnNextLedOn, round, 1000, Timeout.Infinite);
+            Console.WriteLine("Watch the sequence and then enter it:");
+
+            foreach (Color color in sequence)
+            {
+                Console.WriteLine(color);
+                Thread.Sleep(2000);
+                Console.Clear();
+            }
+
+            acceptingInput = true;
+            ProcessUserInput();
         }
 
-        private static void TurnNextLedOn(object state)
+        private static void ProcessUserInput()
         {
-            int currentRound = (int)state;
-            int sequenceLength = currentRound;
-
-            if (sequenceIndex < sequenceLength)
+            while (acceptingInput)
             {
-                leds[(int)sequence[sequenceIndex]].Write(PinValue.High);
-                Thread.Sleep(1000);
-                leds[(int)sequence[sequenceIndex]].Write(PinValue.Low);
-                sequenceIndex++;
-                timer.Change(1000, Timeout.Infinite);
-            }
-            else
-            {
-                sequenceIndex = 0;
-                acceptingInput = true;
-            }
-        }
+                Console.Write("Enter the color (Red, Green, Yellow, or Blue): ");
+                string input = Console.ReadLine();
 
-        private static void Button_ValueChanged(GpioPin led, PinValueChangedEventArgs e, Color color)
-        {
-            if (acceptingInput && e.ChangeType == PinEventTypes.Falling && !gameOver && !debounceActive)
-            {
-                debounceActive = true;
-
-                if (color == sequence[sequenceIndex])
+                if (!string.IsNullOrEmpty(input))
                 {
-                    led.Write(PinValue.High);
-                    Thread.Sleep(500);
-                    led.Write(PinValue.Low);
-                    sequenceIndex++;
+                    input = input.ToLower();
 
-                    Log($"Button {color} Pressed - Correct");
-                    buttonsPressed++;
-
-                    int sequenceLength = round;
-                    if (sequenceIndex >= sequenceLength)
+                    if (Enum.TryParse(input, true, out Color userColor))
                     {
-                        round++;
-                        Log($"Round {round - 1} Finished. Buttons Pressed: {buttonsPressed}");
-                        StartGame();
+                        if (userColor == sequence[sequenceIndex])
+                        {
+                            sequenceIndex++;
+                            Console.WriteLine("Correct!");
+
+                            if (sequenceIndex >= sequence.Length)
+                            {
+                                round++;
+                                Log($"Round {round - 1} Finished. Buttons Pressed: {buttonsPressed}");
+                                StartGame();
+                            }
+                        }
+                        else
+                        {
+                            Console.WriteLine("Incorrect color selected. Game Over.");
+                            Log("Game Over");
+                            gameOver = true;
+                            OutputSummary();
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine("Invalid input. Please enter a valid color.");
                     }
                 }
                 else
                 {
-                    Log($"Button {color} Pressed - Incorrect");
-                    Log("Game Over");
-                    gameOver = true;
-                    OutputSummary();
+                    Console.WriteLine("No input detected. Please enter a color.");
                 }
-
-                // Start debounce timer
-                Timer debounceTimer = new Timer((state) => debounceActive = false, null, 200, Timeout.Infinite);
             }
         }
+
 
         private static Color[] GenerateRandomSequence(int length)
         {
@@ -153,9 +130,8 @@ namespace SimonGame
 
             string logMessage = $"[{elapsedTimeString}] {message}";
 
-            // Write log message to file
             logWriter.WriteLine(logMessage);
-            logWriter.Flush(); // Ensure the message is written immediately
+            logWriter.Flush();
         }
 
         private static void OutputSummary()
