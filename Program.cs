@@ -82,6 +82,7 @@ namespace SimonGame
                         {
                             sequenceIndex++;
                             Console.WriteLine("Correct!");
+                            buttonsPressed++;
 
                             if (sequenceIndex >= sequence.Length)
                             {
