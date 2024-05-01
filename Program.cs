@@ -20,18 +20,25 @@ namespace SimonGame
         private static StreamWriter logWriter;
         private const string LogFilePath = "simon_game_log.txt";
 
-        static void Main()
+        static void Main(string[] args) 
         {
-            Console.WriteLine("Welcome to Simon Game!");
+            if (args.Length > 0 && args[0] == "-S")
+            {
+                DisplaySummary();
+            }
+            else
+            {
+                Console.WriteLine("Welcome to Simon Game!");
 
-            logWriter = new StreamWriter(LogFilePath, true);
+                logWriter = new StreamWriter(LogFilePath, true);
 
-            Log("Game Started");
-            gameStartTime = DateTime.UtcNow;
+                Log("Game Started");
+                gameStartTime = DateTime.UtcNow;
 
-            StartGame();
+                StartGame();
 
-            Console.ReadLine();
+                Console.ReadLine();
+            }
         }
 
         private static void StartGame()
@@ -80,6 +87,7 @@ namespace SimonGame
                     {
                         if (userColor == sequence[sequenceIndex])
                         {
+                            
                             sequenceIndex++;
                             Console.WriteLine("Correct!");
                             buttonsPressed++;
@@ -140,6 +148,63 @@ namespace SimonGame
         {
             Log($"Game Summary - Rounds Finished: {round - 1}, Buttons Pressed: {totalButtonsPressed}");
         }
+
+        //individual part ------------------------------------------------------------------------------------
+
+        private static void DisplaySummary()
+        {
+            string LogFilePath = "simon_game_log.txt";
+            int roundsStarted = 0;
+            int gameOvers = 0;
+            int totalButtonsPressed = 0;
+
+            if (File.Exists(LogFilePath))
+            {
+                string[] lines = File.ReadAllLines(LogFilePath);
+                foreach (string line in lines)
+                {
+                    int buttonsPressedIndex = line.IndexOf("Buttons Pressed:");
+                    if (buttonsPressedIndex != -1)
+                    {
+                        string buttonsPressedStr = line.Substring(buttonsPressedIndex + "Buttons Pressed:".Length).Trim();
+                        if (int.TryParse(buttonsPressedStr, out int buttonsPressed))
+                        {
+                            totalButtonsPressed += buttonsPressed;
+                        }
+                    }
+                    else
+                    {
+                        string[] parts = line.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                        if (parts.Length > 2)
+                        {
+                            if (parts[2] == "Started")
+                            {
+                                roundsStarted++;
+                            }
+                            else if (parts[2] == "Over")
+                            {
+                                gameOvers++;
+                            }
+                        }
+                    }
+                }
+
+                Console.WriteLine($"Total Buttons Pressed: {totalButtonsPressed}");
+                Console.WriteLine($"Rounds Started: {roundsStarted}");
+                Console.WriteLine($"Game Overs: {gameOvers}");
+            }
+            else
+            {
+                Console.WriteLine("Log file not found or empty.");
+            }
+        }
+
+
+
+
+
+
+
 
         private enum Color
         {
